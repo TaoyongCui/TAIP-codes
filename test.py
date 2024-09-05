@@ -143,7 +143,7 @@ parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_
 
 loss_func = nn.L1Loss()
 
-optimizer = AdamW(ssh.parameters(), lr=0.000003, weight_decay=0.0)
+optimizer = AdamW(ssh.parameters(), lr=0.00001, weight_decay=0.0)
 # optimizer2 = AdamW(net.decoder.parameters(), lr=0.0005, weight_decay=0.0)
 # optimizer3 = AdamW(net.decoder_force.parameters(), lr=0.0005, weight_decay=0.0)
 scheduler = StepLR(optimizer, step_size=150, gamma=0.5)

@@ -14,13 +14,13 @@ import sys
 import glob
 from testtime import MLCalculator_schnet
 from ase.constraints import FixAtoms
-from AAAI.PaiNN2 import PainnModel as PaiNN
+from TAIP.PaiNN2 import PainnModel as PaiNN
 from torch import nn
 from testtime import extractor_from_layer, ExtractorHead
 import argparse
 import yaml
 from easydict import EasyDict
-from AAAI_test import EquivariantDenoisePred
+from TAIP_test import EquivariantDenoisePred
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint', type=str, help='Model checkpoint for MLIP-MD')

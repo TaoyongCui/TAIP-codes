@@ -1,3 +1,8 @@
+# Acknowledgments  
+# This code base incorporates the implementation of "Energy-Motivated Equivariant Pretraining for 3D Molecular Graphs"(3D-EMGP) from https://github.com/jiaor17/3D-EMGP, 
+# which is a valuable resource for our work.  
+# We express our sincere gratitude to the authors and contributors of this project for their hard work and dedication.  
+# The integration of their methods and insights has significantly enhanced our research and development efforts.
 import numpy as np
 import pdb
 import torch
@@ -14,7 +19,7 @@ import time
 import random
 from functools import partial
 from dig.threedgraph.evaluation import ThreeDEvaluator
-from AAAI.SchNet2 import SchNetDecoder
+from TAIP.decoder import SchNetDecoder
 torch.autograd.set_detect_anomaly(True)
 loss_func = {
     "L1" : nn.L1Loss(),

@@ -12,11 +12,11 @@ from torch.optim import Adam, AdamW
 import torch.nn.functional as F
 from torch.autograd import grad
 from torch.optim.lr_scheduler import StepLR
-from AAAI.PaiNN import PainnModel as PaiNN
-from AAAI.SchNet2 import *
+from TAIP.PaiNN import PainnModel as PaiNN
+from TAIP.SchNet2 import *
 import math
 from torch_scatter import scatter_add, scatter_max, scatter_min, scatter_mean
-from AAAI_test import EquivariantDenoisePred
+from TAIP_test import EquivariantDenoisePred
 from easydict import EasyDict
 save_dir = './checkpoint/'
 

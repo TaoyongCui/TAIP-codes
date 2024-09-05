@@ -14,10 +14,11 @@ import time
 import random
 from functools import partial
 from dig.threedgraph.evaluation import ThreeDEvaluator
-from AAAI.decoder import SchNetDecoder
+from TAIP.decoder import SchNetDecoder
 torch.autograd.set_detect_anomaly(True)
 loss_func = {
     "L1" : nn.L1Loss(),
+    "Smooth":nn.SmoothL1Loss(),
     "L2" : nn.MSELoss(reduction='none'),
     "Cosine" : nn.CosineSimilarity(dim=-1, eps=1e-08),
     "CrossEntropy" : nn.CrossEntropyLoss(reduction='none')
@@ -45,7 +46,7 @@ class EquivariantDenoisePred(torch.nn.Module):
         self.pred_mode = config.model.pred_mode
         self.model = rep_model
         self.ssh = ssh_model
-        self.node_dec = nn.Sequential(nn.Linear(self.hidden_dim  , self.hidden_dim),
+        self.node_dec = nn.Sequential(nn.Linear(self.hidden_dim , self.hidden_dim),
                                       nn.SiLU(),
                                       nn.Linear(self.hidden_dim, self.hidden_dim))
 
@@ -59,7 +60,7 @@ class EquivariantDenoisePred(torch.nn.Module):
         
         self.decoder = nn.Sequential(nn.Linear(self.hidden_dim, self.hidden_dim),
                                        nn.SiLU(),
-                                       nn.Linear(self.hidden_dim, 43))
+                                       nn.Linear(self.hidden_dim, 22))
 
 
         sigmas = torch.tensor(
@@ -74,17 +75,15 @@ class EquivariantDenoisePred(torch.nn.Module):
 
     def get_energy_and_rep(self, x, pos, data, node2graph, return_pos = False, models = None):
         
-
         xl, posl,edge_index,distance = models(x, pos,data)
-
-
-        xl = self.node_dec(xl)
-
-        xg = scatter_add(xl, node2graph, dim = -2)
+        xl2 = self.node_dec(xl)
+        
+        xg = scatter_add(xl2, node2graph, dim = -2)
 
         e = self.graph_dec(xg)
         if return_pos:
-            return xg.squeeze(-1), xg, posl,xl,edge_index,distance
+            xl3 = scatter_add(xl, node2graph, dim = -2)
+            return xl3.squeeze(-1), xl3, posl,xl,edge_index,distance
         return e, xg
 
     @torch.no_grad()
@@ -213,7 +212,7 @@ class EquivariantDenoisePred(torch.nn.Module):
             loss
         """
         self.device = self.sigmas.device
-        
+
         node2graph = data.batch
         
         noise_level = torch.randint(0, self.sigmas.size(0), (data.num_graphs,), device=self.device) # (num_graph)
@@ -231,28 +230,26 @@ class EquivariantDenoisePred(torch.nn.Module):
         input_pos = perturbed_pos.clone()
         input_pos.requires_grad_(True)
 
-        data.pos = input_pos
         
 
-
-        _, graph_rep_noise, pred_pos, _,_,_ = self.get_energy_and_rep(data.z.long(), input_pos, data, node2graph, return_pos = True, models=self.ssh)
+        _, graph_rep_noise, pred_pos, _,edge_index,distance = self.get_energy_and_rep(data.z.long(), input_pos, data, node2graph, return_pos = True, models=self.ssh)
         
 
 
 
         tmp_pos = pos.clone()
         tmp_pos.requires_grad_(True)
-        data.pos = tmp_pos
 
 
-        mask_z,node_attr_label,masked_node_indices = self.mask(data.z.long().clone(),num_atom_type=43,mask_rate=0.05)
-        energy, _, _, mask_rep,edge_index,distance = self.get_energy_and_rep(mask_z, tmp_pos, data, node2graph, return_pos = True, models=self.ssh)
+
+        mask_z,node_attr_label,masked_node_indices = self.mask(data.z.long().clone(),num_atom_type=22,mask_rate=0.15)
+        energy, _, _, mask_rep,edge_index,edge_attr = self.get_energy_and_rep(mask_z, tmp_pos, data, node2graph, return_pos = True, models=self.ssh)
         
 
         pred_node = self.decoder(mask_rep)
         m_loss = criterion(node_attr_label, pred_node[masked_node_indices])
 
-
+        
 
         grad_outputs: List[Optional[torch.Tensor]] = [torch.ones_like(energy)]
         dy = grad(
@@ -267,19 +264,18 @@ class EquivariantDenoisePred(torch.nn.Module):
 
 
 
-        mask_force,mask_node_labels_list,masked_atom_indices = self.mask_force(pred_noise, 0.05,used_sigmas)
-        dmask_force = self.decoder_force(mask_force,edge_index,distance)
-        
+        mask_force,mask_node_labels_list,masked_atom_indices = self.mask_force(pred_noise, 0.10,used_sigmas)
 
+        dmask_force = self.decoder_force(mask_force,edge_index,edge_attr)
+        
         fm_loss = loss_func['L1'](torch.cat(mask_node_labels_list, dim=0).view(-1, 3), dmask_force[masked_atom_indices].clone().detach())
-        energy_pre, graph_rep_ori = self.get_energy_and_rep(data.z.long(), tmp_pos, data, node2graph, return_pos = False, models=self.model)
-        
-        energy_pre2 = energy_pre
+        energy_pre2, graph_rep_ori = self.get_energy_and_rep(data.z.long(), data.pos, data, node2graph, return_pos = False, models=self.model)
 
-        e_loss = loss_func['L1'](energy_pre2, (data.energy.unsqueeze(1)))
 
+        e_loss = loss_func['L1'](energy_pre2, (data.energy))
         
-        force_pre = -grad(outputs=energy_pre2, inputs=tmp_pos, grad_outputs=torch.ones_like(energy_pre2),create_graph=True,retain_graph=True)[0]
+        
+        force_pre = -grad(outputs=energy_pre2, inputs=data.pos, grad_outputs=torch.ones_like(energy_pre2),create_graph=True,retain_graph=True)[0]
         f_loss = loss_func['L1'](force_pre, data.force)
 
         
@@ -293,7 +289,7 @@ class EquivariantDenoisePred(torch.nn.Module):
 
         pred_scale_ = pred_scale.argmax(dim=1)
 
-
+        loss_denoise = torch.tensor(0.0).to(self.device)
         
 
         return loss_pred_noise.mean() , fm_loss, m_loss,e_loss,f_loss
