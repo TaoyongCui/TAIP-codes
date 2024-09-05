@@ -49,7 +49,7 @@ pip install ase ase[test] ogb
 ### Download the dataset to raw_data and save processed files to processed:
 
 ```
-python xyz2pt.py
+python xyz2pt.py ./raw_data/newliquid_shifted_ev.xyz ./processed/newliquid_shifted_ev.pt
 ```
 
 ### Train model on liquid water
