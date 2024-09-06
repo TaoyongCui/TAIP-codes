@@ -12,11 +12,11 @@ from torch.optim import Adam, AdamW
 import torch.nn.functional as F
 from torch.autograd import grad
 from torch.optim.lr_scheduler import StepLR
-from AAAI.PaiNN import PainnModel as PaiNN
-from AAAI.SchNet2 import *
+from TAIP.PaiNN import PainnModel as PaiNN
+from TAIP.decoder import *
 import math
 from torch_scatter import scatter_add, scatter_max, scatter_min, scatter_mean
-from AAAI_test import EquivariantDenoisePred
+from TAIP_test import EquivariantDenoisePred
 from easydict import EasyDict
 save_dir = './checkpoint/'
 
@@ -27,7 +27,7 @@ np.random.seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-device = torch.device("cuda:1")
+device = torch.device("cuda")
 epochs = 1
 
 evaluation = ThreeDEvaluator()
@@ -121,23 +121,23 @@ head = nn.Sequential(
             nn.Linear(128, 128),
         ).to(device)
 
-ckpt = torch.load('/mnt/workspace/cuitaoyong/TTA_water/checkpoint/final_water/painn_tta.pt',map_location='cpu')        
-rep.load_state_dict(ckpt['model'])
+# ckpt = torch.load('./painn_tta.pt',map_location='cpu')        
+# rep.load_state_dict(ckpt['model'])
 ssh = ExtractorHead(head).to(device)
 net = EquivariantDenoisePred(config, rep, ssh).to(device)
 
-net.model.load_state_dict(ckpt['model'])
-net.graph_dec.load_state_dict(ckpt['graph_dec'])
-net.node_dec.load_state_dict(ckpt['node_dec'])
-head.load_state_dict(ckpt['head'])
-net.noise_pred.load_state_dict(ckpt['noise_pred'])
-net.decoder.load_state_dict(ckpt['decoder'])
-net.decoder_force.load_state_dict(ckpt['decoder_force'])
+# net.model.load_state_dict(ckpt['model'])
+# net.graph_dec.load_state_dict(ckpt['graph_dec'])
+# net.node_dec.load_state_dict(ckpt['node_dec'])
+# head.load_state_dict(ckpt['head'])
+# net.noise_pred.load_state_dict(ckpt['noise_pred'])
+# net.decoder.load_state_dict(ckpt['decoder'])
+# net.decoder_force.load_state_dict(ckpt['decoder_force'])
 
 
 
-train_dataset = torch.load('/mnt/workspace/tangchenyu/dataset/Water/newliquid_shifted.pt')[1000:1300]
-test_dataset = torch.load('/mnt/workspace/tangchenyu/dataset/Water/newliquid_shifted.pt')[1000:1300]
+train_dataset = torch.load('./processed/newliquid_shifted_ev.pt')[1000:1300]
+test_dataset = torch.load('./processed/newliquid_shifted_ev.pt')[1000:1300]
 
 parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_dec.parameters())+list(net.graph_dec.parameters())+list(net.noise_pred.parameters())
 

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import pdb
 from torch_scatter import scatter
-from .SchNet2 import *
+from .decoder import *
 def sinc_expansion(edge_dist: torch.Tensor, edge_size: int, cutoff: float):
     """
     calculate sinc radial basis function:

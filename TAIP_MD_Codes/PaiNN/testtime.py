@@ -12,8 +12,8 @@ from torch.optim import Adam, AdamW
 import torch.nn.functional as F
 from torch.autograd import grad
 from torch.optim.lr_scheduler import StepLR
-from TAIP.PaiNN import PainnModel as PaiNN
-from TAIP.SchNet2 import *
+from TAIP.PaiNN2 import PainnModel as PaiNN
+from TAIP.decoder import *
 import math
 from torch_scatter import scatter_add, scatter_max, scatter_min, scatter_mean
 from TAIP_test import EquivariantDenoisePred

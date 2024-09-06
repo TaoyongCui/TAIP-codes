@@ -127,7 +127,7 @@ class PainnModel(nn.Module):
         self.num_interactions = num_interactions
         self.hidden_state_size = hidden_state_size
         self.edge_embedding_size = 20
-        
+        self.pdb = True
         # Setup atom embeddings
         self.atom_embedding = nn.Embedding(num_embedding, hidden_state_size)
 

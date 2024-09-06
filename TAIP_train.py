@@ -19,7 +19,7 @@ import time
 import random
 from functools import partial
 from dig.threedgraph.evaluation import ThreeDEvaluator
-from AAAI.decoder import SchNetDecoder
+from TAIP.decoder import SchNetDecoder
 torch.autograd.set_detect_anomaly(True)
 loss_func = {
     "L1" : nn.L1Loss(),
