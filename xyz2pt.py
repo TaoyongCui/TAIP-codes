@@ -46,7 +46,7 @@ if __name__ == '__main__':
             x = torch.as_tensor(atoms.numbers, dtype=torch.int)
             cell = torch.as_tensor(atoms.cell[:])
             pos=torch.as_tensor(atoms.positions, dtype=torch.float)
-            dist = (pos[row] - pos[col]).norm(dim=-1)
+
 
             data = Data(
                 pos=pos,
