@@ -122,7 +122,7 @@ net = EquivariantDenoisePred(config, rep, ssh).to(device)
 
 
 
-dataset = torch.load('/ailab/user/cuitaoyong/TAIP-codes/processed/newliquid_shifted_ev.pt')
+dataset = torch.load('./processed/newliquid_shifted_ev.pt')
 print(dataset[0])
 random.shuffle(dataset) 
 
