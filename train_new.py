@@ -126,8 +126,8 @@ dataset = torch.load('./processed/newliquid_shifted_ev.pt')
 print(dataset[0])
 random.shuffle(dataset) 
 
-train_dataset = dataset[:int(len(dataset)*0.8)]
-test_dataset = dataset[int(len(dataset)*0.8):int(len(dataset)*0.9)]
+train_dataset = dataset[:10000]
+test_dataset = dataset[1000:1100]
 
 parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_dec.parameters())+list(net.graph_dec.parameters())+list(net.noise_pred.parameters())
 

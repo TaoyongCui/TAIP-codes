@@ -121,23 +121,27 @@ head = nn.Sequential(
             nn.Linear(128, 128),
         ).to(device)
 
-# ckpt = torch.load('./painn_tta.pt',map_location='cpu')        
-# rep.load_state_dict(ckpt['model'])
+ckpt = torch.load('./painn_tta.pt',map_location='cpu')        
+rep.load_state_dict(ckpt['model'])
 ssh = ExtractorHead(head).to(device)
 net = EquivariantDenoisePred(config, rep, ssh).to(device)
 
-# net.model.load_state_dict(ckpt['model'])
-# net.graph_dec.load_state_dict(ckpt['graph_dec'])
-# net.node_dec.load_state_dict(ckpt['node_dec'])
-# head.load_state_dict(ckpt['head'])
-# net.noise_pred.load_state_dict(ckpt['noise_pred'])
-# net.decoder.load_state_dict(ckpt['decoder'])
-# net.decoder_force.load_state_dict(ckpt['decoder_force'])
+net.model.load_state_dict(ckpt['model'])
+net.graph_dec.load_state_dict(ckpt['graph_dec'])
+net.node_dec.load_state_dict(ckpt['node_dec'])
+head.load_state_dict(ckpt['head'])
+net.noise_pred.load_state_dict(ckpt['noise_pred'])
+net.decoder.load_state_dict(ckpt['decoder'])
+net.decoder_force.load_state_dict(ckpt['decoder_force'])
 
 
+dataset = torch.load('./processed/newliquid_shifted_ev.pt')
+print(dataset[0])
+random.shuffle(dataset) 
 
-train_dataset = torch.load('./processed/newliquid_shifted_ev.pt')[1000:1300]
-test_dataset = torch.load('./processed/newliquid_shifted_ev.pt')[1000:1300]
+train_dataset = dataset[1100:1600]
+test_dataset = dataset[1100:1600]
+
 
 parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_dec.parameters())+list(net.graph_dec.parameters())+list(net.noise_pred.parameters())
 
@@ -196,8 +200,8 @@ def train(net, ssh, optimizer, train_loader, energy_and_force, loss_func, device
         force.append(f_mae)
         energy.append(e_mae)
         loss_accum += loss.detach().cpu().item()
-    print(sum(energy)/len(energy))
-    print(sum(force)/len(force))
+    print("energy mea:", sum(energy)/len(energy))
+    print("force mea:", sum(force)/len(force))
 
     return loss_accum / (step + 1)
 
@@ -234,9 +238,9 @@ def val(net, ssh, valid_loader, energy_and_force, loss_func, device, steps):
 
 
 for epoch in range(1, epochs + 1):
-    print("\n=====Epoch {}".format(epoch), flush=True)
+
     
-    print('\nTraining...', flush=True)
+    print('\nTesting...', flush=True)
     train_mae = train(net, net, optimizer, train_loader, energy_and_force, loss_func, device,steps=epoch)
 
 
