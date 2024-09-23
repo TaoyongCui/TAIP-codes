@@ -67,7 +67,6 @@ python train_new.py --config config.yaml
 python test.py --config config.yaml
 ```
 
-
 ### Molecular dynamic simulation on liquid water
 
 
