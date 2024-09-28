@@ -48,7 +48,7 @@ pip install ase ase[test] ogb
 ### You can view this demo notebook to see our complete training and testing process.
 
 ```
-water.ipynb
+Demo.ipynb
 ```
 
 

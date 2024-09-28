@@ -43,33 +43,40 @@ class ExtractorHead(nn.Module):
         self.head = head
         self.cutoff = 6.0
         self.hidden_state_size = 128
+        self.pdb = True
 
     def forward(self, z, pos, batch_data):
+        pos.requires_grad_()
 
+        if self.pdb:
 
-        edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
-            data = batch_data, radius = self.cutoff, max_num_neighbors_threshold = 500
-        )
-        batch_data.edge_index = edge_index
-        batch_data.cell_offsets = cell_offsets
-        batch_data.neighbors = neighbors
+            edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
+                data = batch_data, radius = self.cutoff, max_num_neighbors_threshold = 500
+            )
+            batch_data.edge_index = edge_index
+            batch_data.cell_offsets = cell_offsets
+            batch_data.neighbors = neighbors
+            assert z.dim() == 1 and z.dtype == torch.long
+            out = get_pbc_distances(
+                batch_data.pos,
+                batch_data.edge_index,
+                batch_data.cell,
+                batch_data.cell_offsets,
+                batch_data.natoms,
+            )
+            input_dict = batch_data
+            edge = out["edge_index"].t()
+            edge_diff = out['distance_vec']
+            edge_dist = out["distances"]
+        else:
+            edge_index = radius_graph(pos, r=self.cutoff, batch=batch_data.batch)
+            row, col = edge_index
+            edge = edge_index.T
+            edge_diff = (pos[row] - pos[col])
+            edge_dist = (pos[row] - pos[col]).norm(dim=-1)            
 
-        assert z.dim() == 1 and z.dtype == torch.long
-        
-        out = get_pbc_distances(
-            batch_data.pos,
-            batch_data.edge_index,
-            batch_data.cell,
-            batch_data.cell_offsets,
-            batch_data.natoms,
-        )
-        input_dict = batch_data
-        edge = out["edge_index"].t()
-        edge_diff = out['distance_vec']
-
-        edge_dist = out["distances"]
         node_scalar = self.ext[0](z)
-        node_vector = torch.zeros((input_dict.pos.shape[0], 3, self.hidden_state_size),
+        node_vector = torch.zeros((pos.shape[0], 3, self.hidden_state_size),
                                   device=edge_diff.device,
                                   dtype=edge_diff.dtype,
                                  )
@@ -82,7 +89,7 @@ class ExtractorHead(nn.Module):
         node_scalar, node_vector = self.ext[6](node_scalar, node_vector)
         v = self.head(node_scalar)
 
-        return v,batch_data.pos,out["edge_index"],out["distances"]
+        return v,batch_data.pos,edge_index,edge_dist
 
 def updated_model(test_datasets):
     test_datasets.pos.requires_grad_(True)
@@ -137,26 +144,30 @@ net.decoder_force.load_state_dict(ckpt['decoder_force'])
 
 dataset = torch.load('./processed/newliquid_shifted_ev.pt')
 print(dataset[0])
-random.shuffle(dataset) 
 
 
-train_dataset = dataset[1100:1600]
+
+
 test_dataset = dataset[1100:1600]
+'''
+#MD17 dataset
 
-
+from MD17 import MD17
+dataset = MD17(root='./', name='aspirin')
+split_idx = dataset.get_idx_split(len(dataset.data.energy), train_size=1000, valid_size=1000, seed=42)
+test_dataset = dataset[split_idx['test']][:1000]
+'''
 parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_dec.parameters())+list(net.graph_dec.parameters())+list(net.noise_pred.parameters())
 
 loss_func = nn.L1Loss()
 
 optimizer = AdamW(ssh.parameters(), lr=0.00001, weight_decay=0.0)
-# optimizer2 = AdamW(net.decoder.parameters(), lr=0.0005, weight_decay=0.0)
-# optimizer3 = AdamW(net.decoder_force.parameters(), lr=0.0005, weight_decay=0.0)
-scheduler = StepLR(optimizer, step_size=150, gamma=0.5)
-# scheduler2 = StepLR(optimizer2, step_size=150, gamma=0.5)
-# scheduler3 = StepLR(optimizer3, step_size=150, gamma=0.5)
 
-train_loader = DataLoader(train_dataset, 1, shuffle=True)
-valid_loader = DataLoader(test_dataset, 1, shuffle=False)
+scheduler = StepLR(optimizer, step_size=150, gamma=0.5)
+
+
+test_loader = DataLoader(train_dataset, 1, shuffle=True)
+
 
 best_valid = float('inf')
 best_e = float('inf')
@@ -173,7 +184,7 @@ sigmas = nn.Parameter(sigmas, requires_grad=False)
 force = []
 energy = [] 
 
-def train(net, ssh, optimizer, train_loader, energy_and_force, loss_func, device, steps):
+def train(net, ssh, optimizer, test_loader, energy_and_force, loss_func, device, steps):
   
     net.train()
     ssh.train()
@@ -184,7 +195,7 @@ def train(net, ssh, optimizer, train_loader, energy_and_force, loss_func, device
         optimizer.zero_grad()
 
         train_batch_data = batch_data.to(device)
-        train_batch_data.cell =train_batch_data.cell.reshape(-1,3,3)
+        train_batch_data.cell =train_batch_data.cell.reshape(-1,3,3) #if pdb 
 
 
         
@@ -207,42 +218,14 @@ def train(net, ssh, optimizer, train_loader, energy_and_force, loss_func, device
     return loss_accum / (step + 1)
 
 
-def val(net, ssh, valid_loader, energy_and_force, loss_func, device, steps):
-  
-    net.train()
-    ssh.train()
-    loss_accum = 0
-    e_losses = 0
-    f_losses = 0
-    den_losses = 0
-    for step, batch_data in enumerate(tqdm(valid_loader)):
 
-        batch_data = batch_data.to(device)
-        batch_data.cell =batch_data.cell.reshape(-1,3,3)
-        batch_data.label = True
-        batch_data.num_atoms = batch_data.natoms
-      
-        loss_denoise, e_loss, f_loss, loss_pred_noise,fmaskloss,m_loss = net(batch_data)
-
-
-        loss = e_loss + m_loss + loss_pred_noise  +f_loss
-
-        loss_accum += loss.detach().cpu().item()
-        e_losses += e_loss.detach().cpu().item()
-        f_losses += f_loss.detach().cpu().item()
-        den_losses = m_loss
-
-   
-
-        
-    return e_losses/ (step + 1), f_losses/ (step + 1),den_losses, loss_accum / (step + 1)
 
 
 for epoch in range(1, epochs + 1):
 
     
     print('\nTesting...', flush=True)
-    train_mae = train(net, net, optimizer, train_loader, energy_and_force, loss_func, device,steps=epoch)
+    train_mae = train(net, net, optimizer, test_loader, energy_and_force, loss_func, device,steps=epoch)
 
 
 

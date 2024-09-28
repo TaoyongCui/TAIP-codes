@@ -51,30 +51,34 @@ class ExtractorHead(nn.Module):
 
     def forward(self, z, pos, batch_data):
 
-        print(z.shape)
-        print(pos.shape)
         pos.requires_grad_()
 
+        if self.pdb:
 
-        edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
-            data = batch_data, radius = self.cutoff, max_num_neighbors_threshold = 500
-        )
-        batch_data.edge_index = edge_index
-        batch_data.cell_offsets = cell_offsets
-        batch_data.neighbors = neighbors
-        assert z.dim() == 1 and z.dtype == torch.long
-        out = get_pbc_distances(
-            batch_data.pos,
-            batch_data.edge_index,
-            batch_data.cell,
-            batch_data.cell_offsets,
-            batch_data.natoms,
-        )
-        input_dict = batch_data
-        edge = out["edge_index"].t()
-        edge_diff = out['distance_vec']
-        edge_dist = out["distances"]
-
+            edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
+                data = batch_data, radius = self.cutoff, max_num_neighbors_threshold = 500
+            )
+            batch_data.edge_index = edge_index
+            batch_data.cell_offsets = cell_offsets
+            batch_data.neighbors = neighbors
+            assert z.dim() == 1 and z.dtype == torch.long
+            out = get_pbc_distances(
+                batch_data.pos,
+                batch_data.edge_index,
+                batch_data.cell,
+                batch_data.cell_offsets,
+                batch_data.natoms,
+            )
+            input_dict = batch_data
+            edge = out["edge_index"].t()
+            edge_diff = out['distance_vec']
+            edge_dist = out["distances"]
+        else:
+            edge_index = radius_graph(pos, r=self.cutoff, batch=batch_data.batch)
+            row, col = edge_index
+            edge = edge_index.T
+            edge_diff = (pos[row] - pos[col])
+            edge_dist = (pos[row] - pos[col]).norm(dim=-1)            
 
         node_scalar = self.ext[0](z)
         node_vector = torch.zeros((pos.shape[0], 3, self.hidden_state_size),
@@ -121,13 +125,23 @@ net = EquivariantDenoisePred(config, rep, ssh).to(device)
 
 
 
+'''
+#MD17 dataset
 
+from MD17 import MD17
+dataset = MD17(root='./', name='aspirin')
+split_idx = dataset.get_idx_split(len(dataset.data.energy), train_size=1000, valid_size=1000, seed=42)
+train_dataset, valid_dataset = dataset[split_idx['train']], dataset[split_idx['valid']]
+'''
+
+
+#Water dataset
 dataset = torch.load('./processed/newliquid_shifted_ev.pt')
 print(dataset[0])
-random.shuffle(dataset) 
+
 
 train_dataset = dataset[:1000]
-test_dataset = dataset[1000:1100]
+valid_dataset = dataset[1000:1100]
 
 parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_dec.parameters())+list(net.graph_dec.parameters())+list(net.noise_pred.parameters())
 
@@ -141,7 +155,7 @@ scheduler2 = StepLR(optimizer2, step_size=150, gamma=0.5)
 scheduler3 = StepLR(optimizer3, step_size=150, gamma=0.5)
 
 train_loader = DataLoader(train_dataset, config.train.batch_size, shuffle=True)
-valid_loader = DataLoader(test_dataset, config.train.batch_size, shuffle=False)
+valid_loader = DataLoader(valid_dataset, config.train.batch_size, shuffle=False)
 
 best_valid = float('inf')
 best_e = float('inf')
