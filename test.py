@@ -137,6 +137,7 @@ net.decoder_force.load_state_dict(ckpt['decoder_force'])
 
 dataset = torch.load('./processed/newliquid_shifted_ev.pt')
 print(dataset[0])
+random.shuffle(dataset) 
 
 
 train_dataset = dataset[1100:1600]
