@@ -36,8 +36,8 @@ checkpoint = args.checkpoint
 savedir = args.save_dir
 initatoms = args.init_atoms
 config = args.config
-temp = args.temp
-steps = args.steps
+Temp = args.temp
+numsteps = args.steps
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -93,9 +93,10 @@ def printenergy(a=atoms):  # store a reference to atoms in the definition.
     temp = ekin / (1.5 * units.kB) / a.get_global_number_of_atoms()
     global steps
     steps += intervals
-    with open(savedir+'/log.testtime_'+str(checkpoint)+str(init_atoms)+str(temp), 'a') as f:
-        f.write(
-        f"Steps={steps:8.0f} Epot={epot:8.2f} Ekin={ekin:8.2f} force_max={eforcemax:8.2f} force_mean={force_mean:8.2f} force_std={force_std:8.2f} temperature={temp:8.2f}\n")
+    print(f"Steps={steps:8.0f} Epot={epot:8.2f} Ekin={ekin:8.2f} force_max={eforcemax:8.2f} force_mean={force_mean:8.2f} force_std={force_std:8.2f} temperature={temp:8.2f}\n")
+    # with open(savedir+'/log.testtime_'+str(checkpoint)+str(Temp), 'a') as f:
+    #     f.write(
+    #     f"Steps={steps:8.0f} Epot={epot:8.2f} Ekin={ekin:8.2f} force_max={eforcemax:8.2f} force_mean={force_mean:8.2f} force_std={force_std:8.2f} temperature={temp:8.2f}\n")
 
 
 # 设置初始温度#
@@ -103,16 +104,16 @@ def printenergy(a=atoms):  # store a reference to atoms in the definition.
 import numpy
 
 numpy.random.seed(123)
-temp = int(temp)
-MaxwellBoltzmannDistribution(atoms, temperature_K=temp,rng=numpy.random)
+Temp = int(Temp)
+MaxwellBoltzmannDistribution(atoms, temperature_K=Temp,rng=numpy.random)
  
 # 设置热偶 MD轨迹保存#
 
-dyn = NVTBerendsen(atoms, 0.5 * units.fs, temperature_K=temp, taut=100 * units.fs)
+dyn = NVTBerendsen(atoms, 0.5 * units.fs, temperature_K=Temp, taut=100 * units.fs)
 
 dyn.attach(printenergy, interval=intervals)
-traj = Trajectory(savedir+'/MD_testtime'+str(checkpoint)+str(temp)+'.traj', 'w', atoms)
+traj = Trajectory(savedir+'/MD_testtime'+str(checkpoint)+str(Temp)+'.traj', 'w', atoms)
 dyn.attach(traj.write, interval=20)
 
-dyn.run(steps)
+dyn.run(numsteps)
 

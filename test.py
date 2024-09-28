@@ -16,7 +16,7 @@ from TAIP.PaiNN import PainnModel as PaiNN
 from TAIP.decoder import *
 import math
 from torch_scatter import scatter_add, scatter_max, scatter_min, scatter_mean
-from TAIP_test import EquivariantDenoisePred
+from TAIP.TAIP_test import EquivariantDenoisePred
 from easydict import EasyDict
 save_dir = './checkpoint/'
 
@@ -137,7 +137,7 @@ net.decoder_force.load_state_dict(ckpt['decoder_force'])
 
 dataset = torch.load('./processed/newliquid_shifted_ev.pt')
 print(dataset[0])
-random.shuffle(dataset) 
+
 
 train_dataset = dataset[1100:1600]
 test_dataset = dataset[1100:1600]
