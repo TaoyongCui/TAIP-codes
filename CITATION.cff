@@ -1,0 +1,7 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors: Taoyong Cui, Chenyu Tang, Dongzhan Zhou, Yuqiang Li, Xingao Gong, Wanli Ouyang, Mao Su, Shufei Zhang
+orcid: https://orcid.org/0000-0002-5532-6636(Taoyong Cui)
+title:Online Test-time Adaptation for Better Generalisation of Interatomic Potentials to Out-of-distribution Data
+version: v1_test_version
+date-released: 2024-11-12
