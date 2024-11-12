@@ -66,7 +66,7 @@ python xyz2pt.py ./raw_data/newliquid_shifted_ev.xyz ./processed/newliquid_shift
 The datasets are sampled using our recently developed active learning method based on evidential deep learning to improve the diversity of atomic structures. We train the models with liquid water, using a training set of 1000 frames and a validation set of 100 frames, and report the test accuracy on randomly sampled 1,000 liquid water and ice structures from the remaining dataset, respectively. 
 
 ```
-python train_new.py --config config.yaml
+python train.py --config config.yaml
 ```
 
 ### Test model on liquid water

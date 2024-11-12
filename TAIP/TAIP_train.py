@@ -40,8 +40,41 @@ def sce_loss(x, y, alpha=1):
     return loss
 criterion = partial(sce_loss, alpha=1.0)
 class EquivariantDenoisePred(torch.nn.Module):
+    """
+    EquivariantDenoisePred is a neural network module designed for equivariant denoising 
+    predictions in graph-based models. It integrates various models to predict noise levels 
+    and forces acting on nodes, while also implementing perturbation strategies.
 
-    def __init__(self, config, rep_model,ssh_model):
+    Attributes:
+        config (Config): Configuration object containing model parameters.
+        hidden_dim (int): Dimensionality of hidden layers.
+        edge_types (int): Number of edge types; determines if edge information is used.
+        noise_type (str): Type of noise to be applied ('riemann', 'kabsch', or 'gaussian').
+        pred_mode (str): Mode of prediction.
+        model (torch.nn.Module): Representation model for node embeddings.
+        ssh (torch.nn.Module): Model with shared parameters for additional processing.
+        node_dec (nn.Sequential): Sequential model for node feature transformation.
+        graph_dec (nn.Sequential): Sequential model for graph-level feature transformation.
+        noise_pred (nn.Sequential): Sequential model for predicting noise levels.
+        decoder (nn.Sequential): Sequential model for generating final outputs.
+        sigmas (nn.Parameter): Predefined noise levels as learnable parameters.
+        decoder_force (SchNetDecoder): Model for predicting forces based on node positions.
+
+    Parameters:
+        config (Config): Configuration object containing model parameters.
+        rep_model (torch.nn.Module): Representation model for the initial processing of nodes.
+        ssh_model (torch.nn.Module): Secondary model for additional processing.
+    """
+
+    def __init__(self, config, rep_model, ssh_model):
+        """
+        Initializes the EquivariantDenoisePred with the specified models and configuration.
+
+        Args:
+            config (Config): Configuration object containing model parameters.
+            rep_model (torch.nn.Module): Representation model for node embeddings.
+            ssh_model (torch.nn.Module): Secondary model for additional processing.
+        """
         super(EquivariantDenoisePred, self).__init__()
         self.config = config
         self.hidden_dim = self.config.model.hidden_dim
@@ -77,7 +110,21 @@ class EquivariantDenoisePred(torch.nn.Module):
 
 
 
-    def get_energy_and_rep(self, x, pos, data, node2graph, return_pos = False, models = None):
+    def get_energy_and_rep(self, x, pos, data, node2graph, return_pos=False, models=None):
+        """
+        Computes energy and representations for the given inputs.
+
+        Args:
+            x (torch.Tensor): Input node features.
+            pos (torch.Tensor): Node positions in 3D space.
+            data (Data): Input data object containing graph information.
+            node2graph (torch.Tensor): Mapping from nodes to graphs.
+            return_pos (bool): If True, return additional position data.
+            models (Optional): Additional models for processing.
+
+        Returns:
+            tuple: Energy or representations, and optionally positional data if return_pos is True.
+        """
         
 
         xl, posl,edge_index,distance = models(x, pos,data)
@@ -94,6 +141,15 @@ class EquivariantDenoisePred(torch.nn.Module):
 
     @torch.no_grad()
     def get_distance(self, data: Data):
+        """
+        Computes distances between connected nodes and updates the edge lengths in the data object.
+
+        Args:
+            data (Data): Input data object containing node positions and edge indices.
+
+        Returns:
+            Data: Updated data object with edge lengths.
+        """
         pos = data.pos
         row, col = data.edge_index
         d = (pos[row] - pos[col]).norm(dim=-1).unsqueeze(-1) # (num_edge, 1)
@@ -102,10 +158,31 @@ class EquivariantDenoisePred(torch.nn.Module):
 
     @torch.no_grad()
     def truncated_normal(self, size, threshold=1):
+        """
+        Generates samples from a truncated normal distribution.
+
+        Args:
+            size (int): Number of samples to generate.
+            threshold (float): Threshold for truncation.
+
+        Returns:
+            torch.Tensor: Samples drawn from the truncated normal distribution.
+        """
         values = truncnorm.rvs(-threshold, threshold, size=size)
         return torch.from_numpy(values)
     @torch.no_grad()
     def mask(self, x, num_atom_type, mask_rate):
+        """
+        Masks a portion of the input features according to the specified mask rate.
+
+        Args:
+            x (torch.Tensor): Input features to be masked.
+            num_atom_type (int): Number of atom types for one-hot encoding.
+            mask_rate (float): Proportion of nodes to mask.
+
+        Returns:
+            tuple: Perturbed input features, node attribute labels, and indices of masked atoms.
+        """
 
         
 
@@ -130,6 +207,17 @@ class EquivariantDenoisePred(torch.nn.Module):
         return x_perturb,node_attr_label,masked_atom_indices
     @torch.no_grad()
     def get_force_target(self, perturbed_pos, pos, node2graph):
+        """
+        Computes the target forces based on the perturbed and original positions.
+
+        Args:
+            perturbed_pos (torch.Tensor): Perturbed node positions.
+            pos (torch.Tensor): Original node positions.
+            node2graph (torch.Tensor): Mapping from nodes to graphs.
+
+        Returns:
+            torch.Tensor: Target forces for the nodes.
+        """
         # s = - (pos_p @ (pos_p.T @ pos_p) - pos @ (pos.T @ pos_p)) / (torch.norm(pos_p.T @ pos_p) + torch.norm(pos.T @ pos_p))
         if self.noise_type == 'riemann':
             v = pos.shape[-1]
@@ -151,12 +239,32 @@ class EquivariantDenoisePred(torch.nn.Module):
 
     @torch.no_grad()
     def gen_edge_onehot(self, edge_types):
+        """
+        Generates one-hot encoded representations for edge types.
+
+        Args:
+            edge_types (torch.Tensor): Tensor of edge types.
+
+        Returns:
+            torch.Tensor or None: One-hot encoded edge types, or None if edge types are not used.
+        """
         if not self.edge_types:
             return None
         return F.one_hot(edge_types.long(), self.edge_types)
 
     @torch.no_grad()
     def fit_pos(self, perturbed_pos, pos, node2graph):
+        """
+        Aligns perturbed positions with the original positions using optimal rotation and translation.
+
+        Args:
+            perturbed_pos (torch.Tensor): Perturbed node positions.
+            pos (torch.Tensor): Original node positions.
+            node2graph (torch.Tensor): Mapping from nodes to graphs.
+
+        Returns:
+            torch.Tensor: Aligned perturbed positions.
+        """
         v = pos.shape[-1]
         center = scatter_mean(pos, node2graph, dim = -2) # B * 3
         perturbed_center = scatter_mean(perturbed_pos, node2graph, dim = -2) # B * 3
@@ -176,6 +284,18 @@ class EquivariantDenoisePred(torch.nn.Module):
 
     @torch.no_grad()
     def perturb(self, pos, node2graph, used_sigmas, steps=1):
+        """
+        Perturbs the node positions using the specified noise type and parameters.
+
+        Args:
+            pos (torch.Tensor): Original node positions.
+            node2graph (torch.Tensor): Mapping from nodes to graphs.
+            used_sigmas (torch.Tensor): Noise levels to apply.
+            steps (int): Number of steps for perturbation.
+
+        Returns:
+            torch.Tensor: Perturbed node positions.
+        """
         if self.noise_type == 'riemann':
             pos_p = pos
             for t in range(1, steps + 1):
@@ -192,7 +312,18 @@ class EquivariantDenoisePred(torch.nn.Module):
             return pos_p
 
 
-    def mask_force(self, force, mask_rate,used_sigmas):
+    def mask_force(self, force, mask_rate, used_sigmas):
+        """
+        Masks a portion of the force values according to the specified mask rate.
+
+        Args:
+            force (torch.Tensor): Force values to be masked.
+            mask_rate (float): Proportion of forces to mask.
+            used_sigmas (torch.Tensor): Noise levels to apply.
+
+        Returns:
+            tuple: Masked forces, list of masked node labels, and indices of masked atoms.
+        """
 
 
 
@@ -208,13 +339,15 @@ class EquivariantDenoisePred(torch.nn.Module):
 
 
         return force,mask_node_labels_list,masked_atom_indices
-
     def forward(self, data):
         """
-        Input:
-            data: torch geometric batched data object
-        Output:
-            loss
+        Performs a forward pass through the model.
+
+        Args:
+            data (Data): Input data object containing features and positions.
+
+        Returns:
+            tuple: Tuple of losses including noise prediction loss, force loss, masked loss, energy loss, and force prediction loss.
         """
         self.device = self.sigmas.device
         

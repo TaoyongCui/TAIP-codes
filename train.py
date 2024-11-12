@@ -41,7 +41,29 @@ def extractor_from_layer(rep):
 
 
 class ExtractorHead(nn.Module):
+    """
+    ExtractorHead is a neural network module that processes node features 
+    and positional information to extract relevant features for further 
+    processing in a graph-based model.
+
+    Attributes:
+        ext (list): A list of extraction modules used to compute node features.
+        head (nn.Module): A final head module that outputs predictions.
+        cutoff (float): The cutoff distance for considering neighbors in the graph.
+        hidden_state_size (int): The size of the hidden state for internal representations.
+        pdb (bool): A flag to toggle between periodic boundary conditions and standard graph processing.
+
+    Parameters:
+        head (nn.Module): The final head module for predictions.
+    """
+
     def __init__(self, head):
+        """
+        Initializes the ExtractorHead with the given head module.
+
+        Args:
+            head (nn.Module): The final head module for predictions.
+        """
         super(ExtractorHead, self).__init__()
         self.ext = ext
         self.head = head
@@ -50,13 +72,29 @@ class ExtractorHead(nn.Module):
         self.pdb = True
 
     def forward(self, z, pos, batch_data):
+        """
+        Forward pass to compute the output based on input features and positions.
 
+        Args:
+            z (torch.Tensor): A tensor of node features (scalar values).
+            pos (torch.Tensor): A tensor of node positions in 3D space.
+            batch_data (BatchData): An object containing data for graph processing.
+
+        Returns:
+            tuple: A tuple containing:
+                - v (torch.Tensor): The final output predictions from the head module.
+                - torch.Tensor: The positions of the nodes.
+                - torch.Tensor: The edge indices of the graph.
+                - torch.Tensor: The distances between connected nodes.
+
+        Raises:
+            AssertionError: If the dimensions of `z` are not as expected.
+        """
         pos.requires_grad_()
 
         if self.pdb:
-
             edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
-                data = batch_data, radius = self.cutoff, max_num_neighbors_threshold = 500
+                data=batch_data, radius=self.cutoff, max_num_neighbors_threshold=500
             )
             batch_data.edge_index = edge_index
             batch_data.cell_offsets = cell_offsets
@@ -78,13 +116,12 @@ class ExtractorHead(nn.Module):
             row, col = edge_index
             edge = edge_index.T
             edge_diff = (pos[row] - pos[col])
-            edge_dist = (pos[row] - pos[col]).norm(dim=-1)            
+            edge_dist = (pos[row] - pos[col]).norm(dim=-1)
 
         node_scalar = self.ext[0](z)
         node_vector = torch.zeros((pos.shape[0], 3, self.hidden_state_size),
                                   device=edge_diff.device,
-                                  dtype=edge_diff.dtype,
-                                 )
+                                  dtype=edge_diff.dtype)
 
         node_scalar, node_vector = self.ext[1](node_scalar, node_vector, edge, edge_diff, edge_dist)
         node_scalar, node_vector = self.ext[2](node_scalar, node_vector)
@@ -94,7 +131,7 @@ class ExtractorHead(nn.Module):
         node_scalar, node_vector = self.ext[6](node_scalar, node_vector)
         v = self.head(node_scalar)
 
-        return v,batch_data.pos,edge_index,edge_dist
+        return v, batch_data.pos, edge_index, edge_dist
 
 
 parser = argparse.ArgumentParser(description='mgp')
