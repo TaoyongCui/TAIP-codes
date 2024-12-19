@@ -1,4 +1,4 @@
-
+# This code is used to process data for water and ice
 from sys import argv
 import ase
 import torch
@@ -22,16 +22,21 @@ if __name__ == '__main__':
     file2=argv[2]
     import os
     import pdb
-    path = r'./'
-    file1 = os.listdir(path)
+
     atoms_all_list = []
-    for files in file1:
-        atoms_all = read(argv[1], index=slice(None), format='extxyz')#[:100]
-        atoms_all_list.append(atoms_all)
+    atoms_all = read(argv[1], index=slice(None), format='extxyz')#[:100]
+    atoms_all_list.append(atoms_all)
 #
     data_list =[]
     for i in range(len(atoms_all_list)):
         for i, atoms in enumerate(atoms_all_list[i]):
+           
+            #shifting the potential energy by atomic energies in vaccum#
+            atom_o = atoms.get_chemical_symbols().count('O')
+            atom_h = atoms.get_chemical_symbols().count('H')
+            energy_shift = atom_o*(-407.84007125944) + atom_h*(-0.16108140)
+            ############################################################
+
             natom = len(atoms)
             pos_arr = atoms.positions
 
@@ -51,7 +56,7 @@ if __name__ == '__main__':
             data = Data(
                 pos=pos,
                 z=x,
-                energy=torch.as_tensor(atoms.get_potential_energy(), dtype=torch.float),
+                energy=torch.as_tensor(atoms.get_potential_energy() - energy_shift, dtype=torch.float),
                 force=torch.as_tensor(atoms.get_forces(), dtype=torch.float),
                 natoms=len(atoms.numbers),
                 cell=cell
@@ -60,3 +65,4 @@ if __name__ == '__main__':
 
 
     torch.save(data_list, file2)
+

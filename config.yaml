@@ -1,7 +1,7 @@
 train:
   batch_size: 2
   seed: 42
-  epochs: 300
+  epochs: 1000
   shuffle: true
   resume_train: false
   eval: true
@@ -38,8 +38,8 @@ model:
   layernorm: False
   max_atom_type: 100
   charge_power: 2
-  n_layers: 7
-  attention: true
+  n_layers: 3
+  out_decoder: 43
 
 
 

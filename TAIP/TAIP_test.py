@@ -40,7 +40,31 @@ def sce_loss(x, y, alpha=1):
     return loss
 criterion = partial(sce_loss, alpha=1.0)
 class EquivariantDenoisePred(torch.nn.Module):
+    """
+    EquivariantDenoisePred is a neural network module designed for equivariant denoising 
+    predictions in graph-based models. It integrates various models to predict noise levels 
+    and forces acting on nodes, while also implementing perturbation strategies.
 
+    Attributes:
+        config (Config): Configuration object containing model parameters.
+        hidden_dim (int): Dimensionality of hidden layers.
+        edge_types (int): Number of edge types; determines if edge information is used.
+        noise_type (str): Type of noise to be applied ('riemann', 'kabsch', or 'gaussian').
+        pred_mode (str): Mode of prediction.
+        model (torch.nn.Module): Representation model for node embeddings.
+        ssh (torch.nn.Module): Model with shared parameters for additional processing.
+        node_dec (nn.Sequential): Sequential model for node feature transformation.
+        graph_dec (nn.Sequential): Sequential model for graph-level feature transformation.
+        noise_pred (nn.Sequential): Sequential model for predicting noise levels.
+        decoder (nn.Sequential): Sequential model for generating final outputs.
+        sigmas (nn.Parameter): Predefined noise levels as learnable parameters.
+        decoder_force (SchNetDecoder): Model for predicting forces based on node positions.
+
+    Parameters:
+        config (Config): Configuration object containing model parameters.
+        rep_model (torch.nn.Module): Representation model for the initial processing of nodes.
+        ssh_model (torch.nn.Module): Secondary model for additional processing.
+    """
     def __init__(self, config, rep_model,ssh_model):
         super(EquivariantDenoisePred, self).__init__()
         self.config = config
@@ -64,9 +88,9 @@ class EquivariantDenoisePred(torch.nn.Module):
         
         self.decoder = nn.Sequential(nn.Linear(self.hidden_dim, self.hidden_dim),
                                        nn.SiLU(),
-                                       nn.Linear(self.hidden_dim, 17))
+                                       nn.Linear(self.hidden_dim, config.model.out_decoder))
 
-
+        self.model.out_decoder =config.model.out_decoder
         sigmas = torch.tensor(
             np.exp(np.linspace(np.log(self.config.model.sigma_begin), np.log(self.config.model.sigma_end),
                                self.config.model.num_noise_level)), dtype=torch.float32)
@@ -248,7 +272,7 @@ class EquivariantDenoisePred(torch.nn.Module):
         data.pos = tmp_pos
 
 
-        mask_z,node_attr_label,masked_node_indices = self.mask(data.z.long().clone(),num_atom_type=17,mask_rate=0.15)
+        mask_z,node_attr_label,masked_node_indices = self.mask(data.z.long().clone(),num_atom_type=self.model.out_decoder,mask_rate=0.05)
         energy, _, _, mask_rep,edge_index,distance = self.get_energy_and_rep(mask_z, tmp_pos, data, node2graph, return_pos = True, models=self.ssh)
         
 
@@ -282,7 +306,7 @@ class EquivariantDenoisePred(torch.nn.Module):
         graph_rep = torch.cat([graph_rep_ori, graph_rep_noise], dim=1)
 
         pred_scale = self.noise_pred(graph_rep)
-
+        
         loss_pred_noise = loss_func['CrossEntropy'](pred_scale, noise_level) 
 
 

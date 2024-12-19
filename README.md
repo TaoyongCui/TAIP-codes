@@ -11,7 +11,7 @@ This is the official implementation for the paper: "Online Test-time Adaptation 
 - [How to run this code](#how-to-run-this-code)
 
 # Overview
-Machine learning interatomic potentials (MLIPs) enable more efficient molecular dynamics (MD) simulations with ab initio accuracy, which have been used in various domains of physical science. However, distribution shift between training and test data causes deterioration of the test performance of MLIPs, and even leads to collapse of MD simulations. In this work, we propose an online Test-time Adaptation Interatomic Potential (TAIP) framework to improve the generalization on test data. Specifically, we design a dual-level self-supervised learning approach that leverages global structure and atomic local environment information to align the model with the test data. Extensive experiments demonstrate TAIP's capability to bridge the domain gap between training and test dataset without additional data. TAIP enhances the test performance on various benchmarks, from small molecule datasets to complex periodic molecular systems with various types of elements. Remarkably, it also enables stable MD simulations where the corresponding baseline models collapse.
+Machine learning interatomic potentials (MLIPs) enable more efficient molecular dynamics (MD) simulations with ab initio accuracy, which have been used in various domains of physical science. However, distribution shift between training and test data causes deterioration of the test performance of MLIPs, and even leads to collapse of MD simulations. In this work, we propose an online Test-time Adaptation Interatomic Potential (TAIP) framework to improve the generalization on test data. Specifically, we design a dual-level self-supervised learning approach that leverages global structure and atomic local environment information to align the model with the test data. Extensive experiments demonstrate TAIP's capability to bridge the domain gap between training and test dataset without additional data. TAIP enhances the test performance on various benchmarks, from small molecule datasets to complex periodic molecular systems with various types of elements. TAIP also enables stable MD simulations where the corresponding baseline models collapse.
 
 
 # System Requirements
@@ -48,7 +48,15 @@ pip install ase ase[test] ogb
 ### You can view this demo notebook to see our complete training and testing process.
 
 ```
-Demo.ipynb
+  The notebook 'Demo_water_TAIP.ipynb' includes processes of data preprocessing, PaiNN-TAIP training on the liquid water dataset, testing on the liquid water/ice test dataset, and molecular dynamics simulations.
+  
+  The notebook 'Demo_water_baseline.ipynb' includes processes of PaiNN baseline training on the liquid water dataset, testing on the liquid water/ice test dataset, and molecular dynamics simulations. 
+  
+  The notebook 'Demo_md17_TAIP.ipynb' includes processes of PaiNN-TAIP training on the non-periodic testcases (aspirin dataset), testing on the aspirin test dataset. 
+  
+  The notebook 'Demo_md17_baseline.ipynb' includes processes of PaiNN baseline training on the non-periodic testcases (aspirin dataset), testing on the aspirin test dataset. 
+  
+  The notebook 'MD_simulations.ipynb' includes processes of molecular dynamics simulations, as well as comparisons between the PaiNN-TAIP and the PaiNN baseline model. 
 ```
 
 
@@ -58,27 +66,39 @@ Demo.ipynb
 ### Download the dataset to raw_data and save processed files to processed:
 
 ```
-python xyz2pt.py ./raw_data/newliquid_shifted_ev.xyz ./processed/newliquid_shifted_ev.pt
+python xyz2pt.py raw_data/liquid_train.xyz processed/water_train.pt
+
+python xyz2pt.py raw_data/liquid_validation.xyz processed/water_valid.pt
+
+python xyz2pt.py raw_data/liquid_test.xyz processed/water_test.pt
+
+python xyz2pt.py raw_data/ice_test.xyz processed/ice_test.pt
 ```
 
 ### Train model on liquid water
 
-The datasets are sampled using our recently developed active learning method based on evidential deep learning to improve the diversity of atomic structures. We train the models with liquid water, using a training set of 1000 frames and a validation set of 100 frames, and report the test accuracy on randomly sampled 1,000 liquid water and ice structures from the remaining dataset, respectively. 
+To train the PaiNN model on the liquid water dataset, you can execute the following command. Note that training the model on a single RTX 4090 GPU card will approximately take 4-5 days.
 
 ```
-python train.py --config config.yaml
+python train_water_TAIP.py --config config.yaml
 ```
 
 ### Test model on liquid water
 
 ```
-python test.py --config config.yaml
+python test_water_TAIP.py --config config.yaml --dataset processed/water_test.pt
 ```
 
 ### Molecular dynamic simulation on liquid water
 
 
 ```
-cd ./TAIP_MD_Codes/PaiNN
-python MD_run.py --checkpoint PaiNN-TAIP.pt --config config.yaml --init_atoms test.xyz --save_dir ./ --temp 300 --steps 10000
+python MD_simulation/MD_run.py --checkpoint checkpoint/TAIP_water.pt --config config.yaml --init_atoms test.xyz --save_dir ./MD --temp 300 --steps 1000000
+```
+
+### Molecular dynamic simulation on ice
+
+
+```
+python MD_simulation/MD_run.py --checkpoint checkpoint/TAIP_water.pt --config config.yaml --init_atoms test2.xyz --save_dir ./MD --temp 300 --steps 1000000
 ```

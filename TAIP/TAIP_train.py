@@ -97,9 +97,9 @@ class EquivariantDenoisePred(torch.nn.Module):
         
         self.decoder = nn.Sequential(nn.Linear(self.hidden_dim, self.hidden_dim),
                                        nn.SiLU(),
-                                       nn.Linear(self.hidden_dim, 43))
+                                       nn.Linear(self.hidden_dim, config.model.out_decoder))
 
-
+        self.model.out_decoder =config.model.out_decoder
         sigmas = torch.tensor(
             np.exp(np.linspace(np.log(self.config.model.sigma_begin), np.log(self.config.model.sigma_end),
                                self.config.model.num_noise_level)), dtype=torch.float32)
@@ -382,7 +382,7 @@ class EquivariantDenoisePred(torch.nn.Module):
         data.pos = tmp_pos
 
 
-        mask_z,node_attr_label,masked_node_indices = self.mask(data.z.long().clone(),num_atom_type=43,mask_rate=0.05)
+        mask_z,node_attr_label,masked_node_indices = self.mask(data.z.long().clone(),num_atom_type=self.model.out_decoder,mask_rate=0.1)
         energy, _, _, mask_rep,edge_index,distance = self.get_energy_and_rep(mask_z, tmp_pos, data, node2graph, return_pos = True, models=self.ssh)
         
 

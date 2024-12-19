@@ -127,7 +127,7 @@ class PainnModel(nn.Module):
         self.num_interactions = num_interactions
         self.hidden_state_size = hidden_state_size
         self.edge_embedding_size = 20
-        self.pdb = True
+        self.pdb = pdb
         # Setup atom embeddings
         self.atom_embedding = nn.Embedding(num_embedding, hidden_state_size)
 
@@ -162,14 +162,16 @@ class PainnModel(nn.Module):
 
         if compute_forces:
             pos.requires_grad_()       
-        edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
-            data = input_dict, radius = self.cutoff, max_num_neighbors_threshold = 500
-        )
-        input_dict.edge_index = edge_index
-        input_dict.cell_offsets = cell_offsets
-        input_dict.neighbors = neighbors
+
         assert z.dim() == 1 and z.dtype == torch.long
         if self.pdb:
+
+            edge_index, cell_offsets, _, neighbors = radius_graph_pbc(
+                data = input_dict, radius = self.cutoff, max_num_neighbors_threshold = 500
+            )
+            input_dict.edge_index = edge_index
+            input_dict.cell_offsets = cell_offsets
+            input_dict.neighbors = neighbors
             out = get_pbc_distances(
                 pos,
                 input_dict.edge_index,
@@ -179,22 +181,20 @@ class PainnModel(nn.Module):
             )
             edge = out["edge_index"].t()
             edge_diff = out['distance_vec']
-            num_atoms = input_dict.num_atoms = torch.tensor([len(z)]) .to(edge.device)
-
             edge_dist = out["distances"]
             
-            node_scalar = self.atom_embedding(z)
-            node_vector = torch.zeros(( pos.shape[0], 3, self.hidden_state_size),
-                                    device=edge_diff.device,
-                                    dtype=edge_diff.dtype,
-                                    )
         else:
             edge_index = radius_graph(pos, r=self.cutoff, batch=input_dict.batch)
             row, col = edge_index
             edge_diff = (pos[row] - pos[col])
             edge_dist = (pos[row] - pos[col]).norm(dim=-1)
-            edge = edge_index.T            
-        
+            edge = edge_index.T
+        num_atoms = input_dict.num_atoms = torch.tensor([len(z)]) .to(edge.device)            
+        node_scalar = self.atom_embedding(z)
+        node_vector = torch.zeros(( pos.shape[0], 3, self.hidden_state_size),
+                                device=edge_diff.device,
+                                dtype=edge_diff.dtype,
+                                )        
         for message_layer, update_layer in zip(self.message_layers, self.update_layers):
             node_scalar, node_vector = message_layer(node_scalar, node_vector, edge, edge_diff, edge_dist)
             node_scalar, node_vector = update_layer(node_scalar, node_vector)
