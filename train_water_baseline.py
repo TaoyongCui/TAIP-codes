@@ -154,11 +154,9 @@ parameters = list(net.model.parameters())+list(head.parameters())+list(net.node_
 loss_func = nn.L1Loss()
 
 optimizer = AdamW(parameters, lr=config.train.optimizer.lr, weight_decay=0.0)
-optimizer2 = AdamW(net.decoder.parameters(), lr=config.train.optimizer.lr, weight_decay=0.0)
-optimizer3 = AdamW(net.decoder_force.parameters(), lr=config.train.optimizer.lr, weight_decay=0.0)
+
 scheduler = StepLR(optimizer, step_size=150, gamma=0.5)
-scheduler2 = StepLR(optimizer2, step_size=150, gamma=0.5)
-scheduler3 = StepLR(optimizer3, step_size=150, gamma=0.5)
+
 
 train_loader = DataLoader(train_dataset, config.train.batch_size, shuffle=True)
 valid_loader = DataLoader(valid_dataset, config.train.batch_size, shuffle=False)
@@ -182,19 +180,17 @@ def train(net, ssh, optimizer, train_loader, energy_and_force, loss_func, device
     loss_accum = 0
     for step, batch_data in enumerate(tqdm(train_loader)):
         optimizer.zero_grad()
-        optimizer2.zero_grad()
-        optimizer3.zero_grad()
+
 
         train_batch_data = batch_data.to(device)
         train_batch_data.cell =train_batch_data.cell.reshape(-1,3,3)
 
-        loss_pred_noise, fm_loss, m_loss,e_loss,f_loss = net(train_batch_data)
-        loss = fm_loss + m_loss + loss_pred_noise + e_loss + P * f_loss
+        e_loss,f_loss = net(train_batch_data)
+        loss = e_loss + P * f_loss
         
         loss.backward()
-        optimizer.step()
-        optimizer2.step()
-        optimizer3.step()
+
+
         loss_accum += loss.detach().cpu().item()
 
     return loss_accum / (step + 1)
@@ -215,18 +211,18 @@ def val(net, ssh, valid_loader, energy_and_force, loss_func, device, steps):
         train_batch_data = batch_data.to(device)
         train_batch_data.cell =train_batch_data.cell.reshape(-1,3,3)
 
-        loss_pred_noise, fm_loss, m_loss,e_loss,f_loss = net(train_batch_data)
+        e_loss,f_loss = net(train_batch_data)
         loss = e_loss + P * f_loss
 
         loss_accum += loss.detach().cpu().item()
         e_losses += e_loss.detach().cpu().item()
         f_losses += f_loss.detach().cpu().item()
-        den_losses = m_loss
+        # den_losses = m_loss
 
    
 
         
-    return e_losses/ (step + 1), f_losses/ (step + 1),den_losses, loss_accum / (step + 1)
+    return e_losses/ (step + 1), f_losses/ (step + 1), loss_accum / (step + 1)
 
 
 for epoch in range(1, epochs + 1):
@@ -237,11 +233,11 @@ for epoch in range(1, epochs + 1):
 
 
 
-    e_mae, f_mae, d_mae, valid_mae = val(net, net, valid_loader, energy_and_force, loss_func, device, steps=epoch)
+    e_mae, f_mae, valid_mae = val(net, net, valid_loader, energy_and_force, loss_func, device, steps=epoch)
 
     print({'e_mae': e_mae})
     print({'f_mae': f_mae})
-    print({'d_mae': d_mae})
+
   
     if valid_mae < best_valid:
         best_valid = valid_mae
@@ -250,8 +246,7 @@ for epoch in range(1, epochs + 1):
             checkpoint = {'epoch': epoch, 'net': rep.state_dict(), 'head': head.state_dict(),'noise_pred':net.noise_pred.state_dict(),'graph_dec':net.graph_dec.state_dict(),'node_dec':net.node_dec.state_dict(),'model':net.model.state_dict(),'decoder_force':net.decoder_force.state_dict(),'decoder':net.decoder.state_dict()}
             torch.save(checkpoint, os.path.join(save_dir, 'baseline_water.pt'))
     scheduler.step()
-    scheduler2.step()
-    scheduler3.step()
+
 
 
 
