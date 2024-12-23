@@ -110,8 +110,8 @@ class ExtractorHead(nn.Module):
         node_scalar, node_vector = self.ext[2](node_scalar, node_vector)
         node_scalar, node_vector = self.ext[3](node_scalar, node_vector, edge, edge_diff, edge_dist)
         node_scalar, node_vector = self.ext[4](node_scalar, node_vector)
-        node_scalar, node_vector = self.ext[5](node_scalar, node_vector, edge, edge_diff, edge_dist)
-        node_scalar, node_vector = self.ext[6](node_scalar, node_vector)
+        # node_scalar, node_vector = self.ext[5](node_scalar, node_vector, edge, edge_diff, edge_dist)
+        # node_scalar, node_vector = self.ext[6](node_scalar, node_vector)
         v = self.head(node_scalar)
 
         return v, batch_data.pos, edge_index, edge_dist

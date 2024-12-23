@@ -91,7 +91,7 @@ class ExtractorHead(nn.Module):
         pos.requires_grad_()
         assert z.dim() == 1 and z.dtype == torch.long
 
-        edge_index = radius_graph(batch_data.pos, r=self.cutoff, batch=batch_data.batch)
+        edge_index = radius_graph(pos, r=self.cutoff, batch=batch_data.batch)
         row, col = edge_index
         edge = edge_index.T
         edge_diff = (pos[row] - pos[col])
@@ -106,8 +106,8 @@ class ExtractorHead(nn.Module):
         node_scalar, node_vector = self.ext[2](node_scalar, node_vector)
         node_scalar, node_vector = self.ext[3](node_scalar, node_vector, edge, edge_diff, edge_dist)
         node_scalar, node_vector = self.ext[4](node_scalar, node_vector)
-        node_scalar, node_vector = self.ext[5](node_scalar, node_vector, edge, edge_diff, edge_dist)
-        node_scalar, node_vector = self.ext[6](node_scalar, node_vector)
+        # node_scalar, node_vector = self.ext[5](node_scalar, node_vector, edge, edge_diff, edge_dist)
+        # node_scalar, node_vector = self.ext[6](node_scalar, node_vector)
         v = self.head(node_scalar)
 
         return v, batch_data.pos, edge_index, edge_dist
@@ -233,7 +233,7 @@ for epoch in range(1, epochs + 1):
         if save_dir != '':
             print('Saving checkpoint...')
             checkpoint = {'epoch': epoch, 'net': rep.state_dict(), 'head': head.state_dict(),'noise_pred':net.noise_pred.state_dict(),'graph_dec':net.graph_dec.state_dict(),'node_dec':net.node_dec.state_dict(),'model':net.model.state_dict(),'decoder_force':net.decoder_force.state_dict(),'decoder':net.decoder.state_dict()}
-            torch.save(checkpoint, os.path.join(save_dir, 'TAIP_MD17_aspirin.pt'))
+            torch.save(checkpoint, os.path.join(save_dir, 'TAIP_MD17_aspirin_new.pt'))
     scheduler.step()
     scheduler2.step()
     scheduler3.step()
