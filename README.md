@@ -102,3 +102,6 @@ python MD_simulation/MD_run.py --checkpoint checkpoint/TAIP_water.pt --config co
 ```
 python MD_simulation/MD_run.py --checkpoint checkpoint/TAIP_water.pt --config config.yaml --init_atoms test2.xyz --save_dir ./MD --temp 300 --steps 1000000
 ```
+
+# License
+This project is licensed under the Apache License 2.0. For more details about the Apache License 2.0, please refer to the [Apache License](http://www.apache.org/licenses/LICENSE-2.0).
